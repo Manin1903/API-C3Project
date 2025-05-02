@@ -87,44 +87,13 @@ class FeedbackSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
-    def create(self, validated_data):
-        photos_data = validated_data.pop('photos', [])
-        solution_files_data = validated_data.pop('solution_files', [])
-        voice_feedback_url = validated_data.pop('voice_feedback', None)
-
-        # Create Feedback instance
-        feedback = Feedback.objects.create(**validated_data)
-
-        # Handle voice_feedback if provided
-        if voice_feedback_url:
-            response = requests.get(voice_feedback_url)
-            if response.status_code == 200:
-                filename = urlparse(voice_feedback_url).path.split('/')[-1]
-                voice_file = ContentFile(response.content, name=filename)
-                feedback.voice_feedback = voice_file
-                feedback.save()
-
-        # Create Photo instances
-        for photo_data in photos_data:
-            PhotoSerializer().create({**photo_data, 'feedback': feedback})
-
-        # Create SolutionFile instances
-        for solution_file_data in solution_files_data:
-            SolutionFileSerializer().create({**solution_file_data, 'feedback': feedback})
-
-        return feedback
-    
     def update(self, instance, validated_data):
         photos_data = validated_data.pop('photos', None)
         solution_files_data = validated_data.pop('solution_files', None)
         voice_feedback_url = validated_data.pop('voice_feedback', None)
-
-        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        # Update voice_feedback if provided
         if voice_feedback_url is not None:
             if voice_feedback_url:
                 response = requests.get(voice_feedback_url)
@@ -137,24 +106,16 @@ class FeedbackSerializer(serializers.ModelSerializer):
             else:
                 instance.voice_feedback = None
             instance.save()
-
-        # Update photos
         if photos_data is not None:
-            existing_photo_ids = {photo.id for photo in instance.photos.all()}
-            provided_photo_urls = {photo['photo'] for photo in photos_data}
-            instance.photos.exclude(photo__in=provided_photo_urls).delete()
+            instance.photos.all().delete()
             for photo_data in photos_data:
                 PhotoSerializer().create({**photo_data, 'feedback': instance})
-
-        # Update solution files
         if solution_files_data is not None:
-            existing_file_ids = {file.id for file in instance.solution_files.all()}
-            provided_file_urls = {file['solution_file'] for file in solution_file_data in solution_files_data}
-            instance.solution_files.exclude(solution_file__in=provided_file_urls).delete()
+            instance.solution_files.all().delete()
             for solution_file_data in solution_files_data:
                 SolutionFileSerializer().create({**solution_file_data, 'feedback': instance})
-
         return instance
+    
 
 class User_InfoSerializer(serializers.ModelSerializer):
     feedback_details = FeedbackSerializer(many=True, required=False)
@@ -180,29 +141,27 @@ class User_InfoSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         feedback_details_data = validated_data.pop('feedback_details', None)
-
-        # Update UserInfo fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        # Update feedback details
         if feedback_details_data is not None:
-            # Delete existing feedback not in the new data
-            existing_feedback_ids = {feedback.id for feedback in instance.feedback_details.all()}
-            provided_feedback_types = {feedback['feedback_type'] for feedback in feedback_details_data}
-            instance.feedback_details.exclude(feedback_type__in=provided_feedback_types).delete()
-
-            # Create or update feedback
             for feedback_data in feedback_details_data:
-                # Pass user through context to FeedbackSerializer
-                feedback_serializer = FeedbackSerializer(
-                    data=feedback_data,
-                    context={'user': instance}
-                )
+                feedback_type = feedback_data.get('feedback_type')
+                try:
+                    feedback_instance = instance.feedback_details.get(feedback_type=feedback_type)
+                    feedback_serializer = FeedbackSerializer(
+                        instance=feedback_instance,
+                        data=feedback_data,
+                        context={'user': instance},
+                        partial=True
+                    )
+                except Feedback.DoesNotExist:
+                    feedback_serializer = FeedbackSerializer(
+                        data=feedback_data,
+                        context={'user': instance}
+                    )
                 if feedback_serializer.is_valid():
                     feedback_serializer.save()
                 else:
                     raise serializers.ValidationError(feedback_serializer.errors)
-
         return instance

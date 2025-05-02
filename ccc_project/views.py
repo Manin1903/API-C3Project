@@ -48,8 +48,7 @@ class ItemDetailView(APIView):
             item = User_Info.objects.get(pk=pk)
         except User_Info.DoesNotExist:
             return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = User_InfoSerializer(item, data=request.data)
+        serializer = User_InfoSerializer(item, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
