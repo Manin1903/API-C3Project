@@ -67,3 +67,5 @@ class SolutionFile(models.Model):
 
     def __str__(self):
         return f"Solution for {self.feedback}"
+    
+

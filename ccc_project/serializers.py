@@ -9,8 +9,8 @@ class PhotoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Photo
-        fields = ['photo', 'uploaded_at']
-        read_only_fields = ['uploaded_at']
+        fields = ['id','photo', 'uploaded_at']
+        read_only_fields = ['id','uploaded_at']
 
     def create(self, validated_data):
         photo_url = validated_data.pop('photo')
@@ -43,9 +43,8 @@ class SolutionFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SolutionFile
-        fields = ['solution_file', 'uploaded_at']
-        read_only_fields = ['uploaded_at']
-
+        fields = ['id','solution_file', 'uploaded_at']
+        read_only_fields = ['id','uploaded_at']
     def create(self, validated_data):
         solution_file_url = validated_data.pop('solution_file')
         feedback = validated_data.pop('feedback', None)
@@ -72,6 +71,7 @@ class SolutionFileSerializer(serializers.ModelSerializer):
         solution_file = ContentFile(response.content, name=filename)
         return SolutionFile.objects.create(solution_file=solution_file, feedback=feedback, **validated_data)
 
+
 class FeedbackSerializer(serializers.ModelSerializer):
     photos = PhotoSerializer(many=True, required=False)
     solution_files = SolutionFileSerializer(many=True, required=False)
@@ -80,7 +80,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Feedback
         fields = [
-            'feedback_type', 'description', 'voice_feedback', 'photos', 'solution_files',
+            'id','feedback_type', 'description', 'voice_feedback', 'photos', 'solution_files',
             'status', 'is_valid', 'executive_approval', 'date_of_issue',
             'problem_statement', 'fact_check', 'root_cause_analysis',
             'corrective_action', 'preventive_action', 'proposals_remarks',
@@ -93,7 +93,6 @@ class FeedbackSerializer(serializers.ModelSerializer):
         solution_files_data = validated_data.pop('solution_files', [])
         voice_feedback_url = validated_data.pop('voice_feedback', None)
 
-        # Get the user from the context
         user = self.context.get('user')
         if not user:
             raise serializers.ValidationError("User must be provided in the context")
